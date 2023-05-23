@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 	//"unsafe"
+	"golang.org/x/sys/unix"
 )
 
 func openPort(name string, baud int, databits byte, parity Parity, stopbits StopBits, readTimeout time.Duration) (p *Port, err error) {
@@ -197,10 +198,35 @@ func (p *Port) Close() (err error) {
 }
 
 func (port *Port) SetRTS(rts bool) error {
-	return nil
+	status, err := port.getModemBitsStatus()
+	if err != nil {
+		return err
+	}
+	if rts {
+		status |= unix.TIOCM_RTS
+	} else {
+		status &^= unix.TIOCM_RTS
+	}
+	return port.setModemBitsStatus(status)
 }
 
 func (port *Port) SetDTR(dtr bool) error {
-	return nil
+	status, err := port.getModemBitsStatus()
+	if err != nil {
+		return err
+	}
+	if dtr {
+		status |= unix.TIOCM_DTR
+	} else {
+		status &^= unix.TIOCM_DTR
+	}
+	return port.setModemBitsStatus(status)
 }
 
+func (port *Port) getModemBitsStatus() (int, error) {
+	return unix.IoctlGetInt((int)(port.f.Fd()), unix.TIOCMGET)
+}
+
+func (port *Port) setModemBitsStatus(status int) error {
+	return unix.IoctlSetPointerInt((int)(port.f.Fd()), unix.TIOCMSET, status)
+}
